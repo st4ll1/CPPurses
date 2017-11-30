@@ -7,13 +7,6 @@ set(CMAKE_BUILD_TYPE Release)
 add_subdirectory(libs/Signals)
 include(GNUInstallDirs)
 enable_testing()
-add_compile_options(-std=c++14 -Werror -ferror-limit=10)
-
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/libs/Signals/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/libs/Signals/libs/Optional/include
-    )
 
 set(SYSTEM_SOURCES
 	"src/system/child_event.cpp"
@@ -53,7 +46,7 @@ set(PAINTER_SOURCES
 	"src/painter/paint_buffer.cpp"
     "src/painter/glyph_matrix.cpp"
     "src/painter/glyph_string.cpp"
-    )	
+    )
 
 set(WIDGET_SOURCES
     "src/widget/widget.cpp"
@@ -95,7 +88,7 @@ set(WIDGET_SOURCES
     "src/widget/blank_height.cpp"
     )
 
-set(TEST_SOURCES 
+set(TEST_SOURCES
     "test/system/system_test.cpp"
 	"test/system/object_test.cpp"
 	"test/system/event_loop_test.cpp"
@@ -157,6 +150,44 @@ add_library(cppurses STATIC
     ${WIDGET_SOURCES}
     )
 
+# following block is copied from the GSL library
+# when minimum version required is 3.8.0 remove if below
+# both branches do exactly the same thing
+if (CMAKE_MAJOR_VERSION VERSION_LESS 3.7.9)
+    if (NOT MSVC)
+        include(CheckCXXCompilerFlag)
+        CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX14)
+        if(COMPILER_SUPPORTS_CXX14)
+            target_compile_options(cppurses INTERFACE "-std=c++14")
+        else()
+            message(FATAL_ERROR "The compiler ${CMAKE_CXX_COMPILER} has no C++14 support. Please use a different C++ compiler.")
+        endif()
+
+    endif()
+else ()
+    # set the cppurses library to be compiled only with c++14
+    target_compile_features(cppurses INTERFACE cxx_std_14)
+    # on *nix systems force the use of -std=c++XX instead of -std=gnu++XX (default)
+    set(CMAKE_CXX_EXTENSIONS OFF)
+endif()
+
+# link ncurses and tinfo here so you only have to link cppursess at the application
+target_link_libraries(cppurses INTERFACE
+	ncurses
+	tinfo
+	)
+
+target_compile_options(cppurses PUBLIC
+    -Werror
+    $<$<CXX_COMPILER_ID:Clang>:-ferror-limit=10>
+    )
+
+target_include_directories(cppurses PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/Signals/include
+	${CMAKE_CURRENT_SOURCE_DIR}/libs/Signals/libs/Optional/include
+	)
+
 install(TARGETS cppurses
     ARCHIVE  DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY  DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -165,7 +196,7 @@ install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 # Demos
 add_executable(demo ${DEMO_SOURCES})
-target_link_libraries(demo cppurses ncurses tinfo)
+target_link_libraries(demo cppurses)
 
 # Tests
 # add_executable(testcppurses ${TEST_SOURCES})
